@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turnos Pazy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <meta name="color-scheme" content="light dark" />
+    <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="headerClean">
+        <div class="brand">
+          <div class="brandMark" aria-hidden="true"></div>
+          <div class="brandText">
+            <div class="brandTitle">Turnos</div>
+            <div class="brandSub">Pazy</div>
+          </div>
+        </div>
+        <div class="statusRow">
+          <div id="status" class="status muted">Listo.</div>
+        </div>
+      </header>
+
+      <main class="content">
+        <section class="gridTop">
+          <div class="card cardTight">
+            <div class="cardHeader">
+              <div>
+                <h2>Semana</h2>
+                <p id="localHint" class="muted">
+                  Empieza en local: elige jueves y pulsa <strong>Generar</strong>.
+                </p>
+              </div>
+            </div>
+            <div class="row">
+              <div class="control">
+                <label for="weekStart">Jueves (inicio)</label>
+                <input id="weekStart" type="date" />
+              </div>
+              <div class="actions">
+                <button id="btnGenerate" class="btn" type="button">Generar</button>
+                <button id="btnSaveImage" class="btn primary" type="button">Guardar imagen</button>
+              </div>
+            </div>
+          </div>
+
+          <details class="card cardTight integrationCard">
+            <summary>Integración Google (opcional)</summary>
+            <div class="integrationBody">
+              <div class="control">
+                <label for="webAppUrl">Web App URL</label>
+                <input
+                  id="webAppUrl"
+                  type="url"
+                  placeholder="URL de Apps Script (Web App)"
+                  spellcheck="false"
+                />
+              </div>
+              <div class="control small">
+                <label for="sheetId">Google Sheet ID</label>
+                <input id="sheetId" type="text" placeholder="ID del Sheet" spellcheck="false" />
+              </div>
+              <div class="actions">
+                <button id="btnLoad" class="btn ghost" type="button">Cargar</button>
+                <button id="btnSave" class="btn ghost" type="button">Guardar</button>
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <section class="card">
+          <div class="cardHeader">
+            <div>
+              <h2>Horario</h2>
+              <p id="subtitle" class="muted">Semana de jueves a miércoles</p>
+            </div>
+          </div>
+
+          <div id="scheduleCapture" class="capture">
+            <div class="scheduleMeta">
+              <div class="metaItem">
+                <div class="metaLabel">Semana</div>
+                <div id="metaWeek" class="metaValue">—</div>
+              </div>
+              <div class="metaItem">
+                <div class="metaLabel">Generado</div>
+                <div id="metaGeneratedAt" class="metaValue">—</div>
+              </div>
+            </div>
+
+            <div class="tableWrap" role="region" aria-label="Tabla de turnos">
+              <table class="scheduleTable">
+                <thead>
+                  <tr>
+                    <th class="colDay">Día</th>
+                    <th class="colType">Tipo</th>
+                    <th class="colShift">8–14<br /><span class="muted">Mañana</span></th>
+                    <th class="colShift">14–22<br /><span class="muted">Tarde</span></th>
+                    <th class="colShift">22–8<br /><span class="muted">Noche</span></th>
+                  </tr>
+                </thead>
+                <tbody id="scheduleBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </section>
+
+        <section class="gridBottom">
+          <section class="card">
+            <div class="cardHeader">
+              <div>
+                <h2>Cambios</h2>
+                <p class="muted">Reasignar o intercambiar y que quede reflejado.</p>
+              </div>
+            </div>
+
+            <div class="changeGrid">
+              <div class="control">
+                <label for="changeSlot">Casilla</label>
+                <select id="changeSlot"></select>
+              </div>
+              <div class="control">
+                <label for="changeMode">Acción</label>
+                <select id="changeMode">
+                  <option value="REASSIGN">Reasignar</option>
+                  <option value="SWAP">Intercambiar (A ↔ B)</option>
+                </select>
+              </div>
+              <div class="control">
+                <label for="changeFrom">De</label>
+                <select id="changeFrom"></select>
+              </div>
+              <div class="control">
+                <label for="changeTo">A</label>
+                <select id="changeTo"></select>
+              </div>
+              <div class="control full">
+                <label for="changeReason">Motivo (opcional)</label>
+                <input id="changeReason" type="text" placeholder="Ej. Cambio acordado" />
+              </div>
+              <div class="control full">
+                <button id="btnApplyChange2" class="btn" type="button">Aplicar cambio</button>
+              </div>
+            </div>
+
+            <div class="historyWrap">
+              <table class="historyTable">
+                <thead>
+                  <tr>
+                    <th>Fecha/hora</th>
+                    <th>Casilla</th>
+                    <th>Antes</th>
+                    <th>Después</th>
+                    <th>Motivo</th>
+                  </tr>
+                </thead>
+                <tbody id="changesBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="cardHeader">
+              <div>
+                <h2>Resumen</h2>
+                <p class="muted">Fijos / Back-ups por comercial.</p>
+              </div>
+            </div>
+            <div class="summaryWrap">
+              <table class="summaryTable">
+                <thead>
+                  <tr>
+                    <th>Comercial</th>
+                    <th class="num">Fijos</th>
+                    <th class="num">Back-ups</th>
+                    <th class="num">Total</th>
+                  </tr>
+                </thead>
+                <tbody id="summaryBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="cardHeader">
+              <div>
+                <h2>Pazytos</h2>
+                <p class="muted">Lista de nombres (desde Sheets o por defecto).</p>
+              </div>
+            </div>
+            <div id="peopleList" class="peopleList"></div>
+          </section>
+        </section>
+      </main>
+
+      <footer class="footer muted">
+        Hecho para planificación de turnos (jueves–miércoles). La conexión a Sheets/Drive requiere Apps Script Web App.
+      </footer>
+    </div>
+  </body>
+</html>
