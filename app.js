@@ -165,7 +165,8 @@ function renderMeta(schedule) {
 }
 
 function renderPeople(people) {
-  const wrap = qs("peopleList");
+  const wrap = document.getElementById("peopleList");
+  if (!wrap) return;
   wrap.innerHTML = "";
   for (const p of people) {
     const chip = document.createElement("div");
