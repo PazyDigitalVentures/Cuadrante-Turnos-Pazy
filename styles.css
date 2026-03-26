@@ -41,9 +41,7 @@ html,body{ height:100%; }
 body{
   margin:0;
   font-family: var(--fontMain);
-  background:
-    radial-gradient(1200px 420px at 50% 0%, rgba(0,198,204,.20), transparent 60%),
-    var(--bg);
+  background: rgba(0, 198, 204, 0.12);
   color: var(--text);
 }
 
