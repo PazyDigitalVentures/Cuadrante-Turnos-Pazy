@@ -437,18 +437,27 @@ function renderExcludeControl(peopleModel, state, onChange) {
   const excluded = getExcludedSet(state);
   el.innerHTML = "";
   for (const name of peopleModel.all) {
-    const opt = document.createElement("option");
-    opt.value = name;
-    opt.textContent = name;
-    opt.selected = excluded.has(normalizeName(name));
-    el.appendChild(opt);
+    const row = document.createElement("label");
+    row.className = "checkItem";
+    const chk = document.createElement("input");
+    chk.type = "checkbox";
+    chk.value = name;
+    chk.checked = excluded.has(normalizeName(name));
+    chk.addEventListener("change", () => {
+      const selected = Array.from(el.querySelectorAll("input[type='checkbox']:checked")).map((x) => x.value);
+      setExcludedPeople(state, selected);
+      if (chk.checked) {
+        const vacSel = document.getElementById("vacPerson");
+        if (vacSel) vacSel.value = name;
+      }
+      onChange();
+    });
+    row.appendChild(chk);
+    const txt = document.createElement("span");
+    txt.textContent = name;
+    row.appendChild(txt);
+    el.appendChild(row);
   }
-
-  el.onchange = () => {
-    const selected = Array.from(el.selectedOptions).map((o) => o.value);
-    setExcludedPeople(state, selected);
-    onChange();
-  };
 }
 
 function renderVacationsThisWeek(vacationEvents) {
@@ -488,8 +497,10 @@ function renderMiniCalendar(weekStartISO) {
   const week = buildWeek(ws);
   const inWeek = new Set(week.map((d) => d.iso));
 
-  const year = ws.getFullYear();
-  const month = ws.getMonth();
+  const offset = Number(window.__state?.calendarMonthOffset || 0);
+  const target = new Date(ws.getFullYear(), ws.getMonth() + offset, 1);
+  const year = target.getFullYear();
+  const month = target.getMonth();
   const first = new Date(year, month, 1);
   const last = new Date(year, month + 1, 0);
   const startDow = (first.getDay() + 6) % 7; // lunes=0
@@ -504,6 +515,8 @@ function renderMiniCalendar(weekStartISO) {
   while (cells.length % 7 !== 0) cells.push({ empty: true });
 
   const heads = ["L", "M", "X", "J", "V", "S", "D"];
+  const monthLabel = document.getElementById("monthLabel");
+  if (monthLabel) monthLabel.textContent = target.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
   el.innerHTML =
     heads.map((h) => `<div class="calHead">${h}</div>`).join("") +
     cells
@@ -543,32 +556,25 @@ function renderScheduleTable(schedule, peopleModel, onSelectChange) {
       for (const franja of FRANJAS) {
         const td = document.createElement("td");
 
-        const isTodos = isTodosDayFranja(schedule, day.iso, franja.key);
-        if (isTodos) {
-          const d = document.createElement("div");
-          d.className = "slotTodos";
-          d.textContent = "TODOS";
-          td.appendChild(d);
-        } else {
-          const id = slotId(day.iso, franja.key, tipo.key);
-          const sel = document.createElement("select");
-          sel.className = "slotSelect";
-          sel.dataset.slotId = id;
+        const id = slotId(day.iso, franja.key, tipo.key);
+        const sel = document.createElement("select");
+        sel.className = "slotSelect";
+        sel.dataset.slotId = id;
+        const available = availablePeopleForDate(peopleModel, day.iso);
+        sel.appendChild(buildOption("—", ""));
+        sel.appendChild(buildOption("TODOS", "__TODOS__"));
+        for (const name of available) sel.appendChild(buildOption(name, name));
+        const cur = schedule.slots[id];
+        sel.value = cur?.modo === "TODOS" ? "__TODOS__" : (cur?.asignadoA || "");
 
-          const available = availablePeopleForDate(peopleModel, day.iso);
-          sel.appendChild(buildOption("—", ""));
-          for (const name of available) sel.appendChild(buildOption(name, name));
-          sel.value = schedule.slots[id]?.asignadoA || "";
+        sel.addEventListener("change", () => {
+          if (sel.value === "__TODOS__") setSlot(schedule, id, { modo: "TODOS", asignadoA: "" });
+          else setSlot(schedule, id, { modo: "NORMAL", asignadoA: sel.value });
+          renderSummary(schedule);
+          onSelectChange();
+        });
 
-          sel.addEventListener("change", () => {
-            setSlot(schedule, id, { asignadoA: sel.value });
-            renderSummary(schedule);
-            refreshChangeSlotOptions(schedule);
-            onSelectChange();
-          });
-
-          td.appendChild(sel);
-        }
+        td.appendChild(sel);
 
         tr.appendChild(td);
       }
@@ -599,6 +605,7 @@ function escapeHtml(str) {
 }
 
 function refreshChangeSlotOptions(schedule) {
+  if (!document.getElementById("changeSlot")) return;
   const slotSel = qs("changeSlot");
   const prev = slotSel.value;
   slotSel.innerHTML = "";
@@ -627,6 +634,7 @@ function refreshChangeSlotOptions(schedule) {
 }
 
 function refreshChangePeopleOptions(schedule) {
+  if (!document.getElementById("changeSlot")) return;
   const slotSel = qs("changeSlot");
   const fromSel = qs("changeFrom");
   const toSel = qs("changeTo");
@@ -654,6 +662,7 @@ function refreshChangePeopleOptions(schedule) {
 }
 
 function renderChangesHistory(changes) {
+  if (!document.getElementById("changesBody")) return;
   const body = qs("changesBody");
   body.innerHTML = "";
   for (const c of changes) {
@@ -750,19 +759,7 @@ function renderVacationPersonOptions(state) {
 }
 
 function wireTodosToggles(schedule) {
-  const tbody = qs("scheduleBody");
-  tbody.ondblclick = (ev) => {
-    const sel = ev.target?.closest?.("select.slotSelect");
-    if (!sel) return;
-    const id = sel.dataset.slotId;
-    if (!id) return;
-    const { iso, franja } = splitSlotId(id);
-    const franjaKey = franja;
-    const on = !isTodosDayFranja(schedule, iso, franjaKey);
-    setTodosForDayFranja(schedule, iso, franjaKey, on);
-    if (typeof window.__rerender === "function") window.__rerender();
-    setStatus(on ? "Marcado como TODOS (doble click para revertir)." : "TODOS desactivado.", "ok");
-  };
+  void schedule;
 }
 
 function renderAll(schedule, peopleModel, state, onExcludeChange, onSelectChange) {
@@ -823,7 +820,6 @@ function init() {
   const state = normalizeState(loadState());
   const weekStart = ensureWeekStartIsThursday(state.weekStart || toISODate(computeWeekStartThursday(new Date())));
   qs("weekStart").value = weekStart;
-  qs("peopleInput").value = buildPeopleTextarea(state.people);
 
   let schedule = state.schedulesByWeek[weekStart] || createEmptySchedule(weekStart);
   let changes = state.changesByWeek[weekStart] || [];
@@ -853,9 +849,7 @@ function init() {
       persistDebounced("exclusion");
     }, () => persistDebounced("edicion"));
     renderVacationsThisWeek(buildVacationEventsForWeek(peopleModel.vacationsByISO, schedule.weekStart));
-    renderImagePreview(lastImage);
     renderVacationPersonOptions(state);
-    renderVacationManagerList(state);
     renderChangesHistory(changes);
   };
   window.__rerender = rerender;
@@ -873,83 +867,15 @@ function init() {
   };
 
   qs("weekStart").addEventListener("change", () => hardReload());
-
-  qs("changeSlot").addEventListener("change", () => refreshChangePeopleOptions(schedule));
-
-  const applyChange = async () => {
-    const slotIdVal = qs("changeSlot").value;
-    if (!slotIdVal) return;
-    const mode = qs("changeMode").value;
-    const from = normalizeName(qs("changeFrom").value);
-    const to = normalizeName(qs("changeTo").value);
-    const motivo = clampStr(qs("changeReason").value);
-
-    const before = schedule.slots[slotIdVal]?.asignadoA || "";
-    if (mode === "REASSIGN") {
-      if (!to) {
-        setStatus("Selecciona a quién reasignar.", "warn");
-        return;
-      }
-      setSlot(schedule, slotIdVal, { asignadoA: to });
-      changes.unshift({
-        timestamp: new Date().toLocaleString("es-ES"),
-        slotId: slotIdVal,
-        slotLabel: buildSlotLabel(slotIdVal),
-        antes: before || "—",
-        despues: to,
-        motivo,
-      });
-    } else {
-      if (!from || !to) {
-        setStatus("Selecciona 'De' y 'A' para intercambiar.", "warn");
-        return;
-      }
-      // SWAP: slot seleccionada intercambia con otra casilla donde esté "to" dentro de la semana y mismo tipo/franja
-      const { franja, tipo } = splitSlotId(slotIdVal);
-      const weekSlots = Object.values(schedule.slots).filter(
-        (s) => s.weekStart === schedule.weekStart && s.franja === franja && s.tipo === tipo && s.modo !== "TODOS",
-      );
-      const other = weekSlots.find((s) => normalizeName(s.asignadoA) === to);
-      if (!other) {
-        setStatus(`No encuentro otra casilla con ${to} en la misma franja/tipo para intercambiar.`, "warn");
-        return;
-      }
-      const aId = slotIdVal;
-      const bId = other.id;
-      const aName = schedule.slots[aId]?.asignadoA || "";
-      const bName = schedule.slots[bId]?.asignadoA || "";
-      setSlot(schedule, aId, { asignadoA: bName });
-      setSlot(schedule, bId, { asignadoA: aName });
-      changes.unshift({
-        timestamp: new Date().toLocaleString("es-ES"),
-        slotId: aId,
-        slotLabel: `${buildSlotLabel(aId)} ↔ ${buildSlotLabel(bId)}`,
-        antes: `${aName || "—"} / ${bName || "—"}`,
-        despues: `${bName || "—"} / ${aName || "—"}`,
-        motivo,
-      });
-    }
-
+  qs("btnMonthPrev").addEventListener("click", () => {
+    state.calendarMonthOffset = Number(state.calendarMonthOffset || 0) - 1;
     rerender();
-    setStatus("Cambio aplicado.", "ok");
-    persistDebounced("cambio");
-  };
-
-  // Botón legacy (si existiera en versiones anteriores)
-  const maybeApply = document.getElementById("btnApplyChange");
-  if (maybeApply) maybeApply.addEventListener("click", applyChange);
-  qs("btnApplyChange2").addEventListener("click", applyChange);
-
-  qs("btnApplyPeople").addEventListener("click", () => {
-    const people = parsePeopleTextarea(qs("peopleInput").value);
-    if (!people.length) {
-      setStatus("Introduce al menos 1 comercial.", "warn");
-      return;
-    }
-    state.people = people;
-    peopleModel = makePeopleModel(state.people, buildVacationsByISO(state.vacationRanges));
+    persistDebounced("mes");
+  });
+  qs("btnMonthNext").addEventListener("click", () => {
+    state.calendarMonthOffset = Number(state.calendarMonthOffset || 0) + 1;
     rerender();
-    persist("comerciales");
+    persistDebounced("mes");
   });
 
   qs("btnSaveImage").addEventListener("click", async () => {
@@ -959,7 +885,6 @@ function init() {
       lastImage = data;
       state.imagesMeta.unshift(data);
       state.imagesMeta = state.imagesMeta.slice(0, 50);
-      renderImagePreview(lastImage);
       persist("imagen");
     } catch (e) {
       setStatus(`No se pudo guardar imagen: ${e.message}`, "bad");
@@ -1004,32 +929,6 @@ function init() {
     peopleModel = makePeopleModel(state.people, buildVacationsByISO(state.vacationRanges));
     rerender();
     persist("vacaciones");
-  });
-
-  qs("btnExportData").addEventListener("click", () => {
-    persist("export");
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `turnos-pazy-data-${todayISO()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  });
-
-  qs("btnImportData").addEventListener("click", () => qs("fileImportData").click());
-  qs("fileImportData").addEventListener("change", async (ev) => {
-    const file = ev.target.files?.[0];
-    if (!file) return;
-    const txt = await file.text();
-    const imported = normalizeState(JSON.parse(txt));
-    Object.assign(state, imported);
-    qs("peopleInput").value = buildPeopleTextarea(state.people);
-    qs("weekStart").value = state.weekStart;
-    await hardReload();
-    persist("import");
   });
 
   hardReload().catch((e) => setStatus(`Error: ${e.message}`, "bad"));

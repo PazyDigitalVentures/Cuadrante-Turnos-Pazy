@@ -48,7 +48,7 @@ body{
   color: var(--text);
 }
 
-.app{ max-width: 1400px; margin: 0 auto; padding: 18px 18px 40px; }
+.app{ max-width: 1280px; margin: 0 auto; padding: 12px 12px 24px; }
 
 .headerClean{
   display:flex;
@@ -69,8 +69,8 @@ body{
 
 .gridTop{
   display:grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 @media (max-width: 1000px){
   .gridTop{ grid-template-columns: 1fr; }
@@ -78,8 +78,8 @@ body{
 
 .gridBottom{
   display:grid;
-  grid-template-columns: 1.2fr .9fr .9fr;
-  gap: 14px;
+  grid-template-columns: .95fr .75fr;
+  gap: 10px;
 }
 @media (max-width: 1200px){
   .gridBottom{ grid-template-columns: 1fr; }
@@ -92,17 +92,29 @@ body{
   justify-content: space-between;
   flex-wrap: wrap;
 }
-.rowTight{ margin-top: 10px; align-items:flex-start; }
+.rowTight{ margin-top: 6px; align-items:flex-start; }
 .control.wide{ min-width: 420px; flex: 1; }
-select[multiple]{ height: 112px; padding: 10px; }
+.compactRow .control{ min-width: 150px; }
+.checkList{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  max-height: 120px;
+  overflow: auto;
+  background: rgba(255,255,255,.04);
+}
+.checkItem{ display:flex; align-items:center; gap:6px; font-size: 12px; }
 
 .vacBox{
-  min-width: 260px;
+  min-width: 240px;
   flex: 1;
   border: 1px solid var(--border);
   background: rgba(255,255,255,.04);
   border-radius: 14px;
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 .vacTitle{ font-size: 12px; font-weight: 800; color: var(--muted); margin-bottom: 6px; }
 .vacList{ font-size: 13px; line-height: 1.35; }
@@ -189,8 +201,8 @@ select[multiple]{ height: 112px; padding: 10px; }
 .control.full{ grid-column: 1 / -1; }
 label{ font-size: 12px; color: var(--muted); }
 input, select, textarea{
-  height: 38px;
-  padding: 8px 10px;
+  height: 32px;
+  padding: 6px 8px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: rgba(255,255,255,.06);
@@ -209,8 +221,8 @@ input:focus, select:focus, textarea:focus{
 
 .actions{ display:flex; gap:10px; align-items:center; }
 .btn{
-  height: 38px;
-  padding: 0 14px;
+  height: 32px;
+  padding: 0 10px;
   border-radius: 12px;
   border: 1px solid rgba(0,198,204,.45);
   color: var(--text);
@@ -232,14 +244,14 @@ input:focus, select:focus, textarea:focus{
   box-shadow: 0 12px 26px rgba(0,198,204,.22);
 }
 
-.content{ padding-top: 16px; display:flex; flex-direction: column; gap: 16px; }
+.content{ padding-top: 10px; display:flex; flex-direction: column; gap: 10px; }
 
 .card{
   border: 1px solid var(--border);
   background: linear-gradient(180deg, var(--panel2), var(--panel));
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 16px;
+  padding: 12px;
 }
 .cardHeader{
   display:flex;
@@ -249,7 +261,7 @@ input:focus, select:focus, textarea:focus{
   padding-bottom: 12px;
 }
 h2{ letter-spacing: -.2px; }
-h2{ margin:0; font-size: 18px; }
+h2{ margin:0; font-size: 16px; }
 h3{ margin:0; font-size: 15px; }
 p{ margin:6px 0 0; }
 .muted{ color: var(--muted); }
@@ -289,7 +301,7 @@ p{ margin:6px 0 0; }
 }
 .scheduleTable th, .scheduleTable td{
   border-bottom: 1px solid var(--border);
-  padding: 10px 10px;
+  padding: 7px 8px;
   vertical-align: middle;
 }
 .scheduleTable thead th{
@@ -328,7 +340,7 @@ p{ margin:6px 0 0; }
 
 .slotSelect{
   width: 100%;
-  height: 38px;
+  height: 32px;
   border-radius: 12px;
 }
 .slotSelect[disabled]{ opacity: .55; }
