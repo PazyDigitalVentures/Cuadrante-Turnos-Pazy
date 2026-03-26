@@ -64,6 +64,12 @@ body{
   background: linear-gradient(135deg, var(--pazyDark), var(--pazy));
   box-shadow: 0 10px 25px rgba(0,198,204,.22);
 }
+.brandLogo{
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: block;
+}
 .brandTitle{ font-weight: 800; letter-spacing: .2px; font-size: 18px; line-height: 1.1; }
 .brandSub{ font-weight: 700; color: var(--muted); font-size: 13px; margin-top: 2px; }
 
@@ -282,7 +288,7 @@ h2{ margin:0; font-size: 16px; }
 h3{ margin:0; font-size: 15px; }
 p{ margin:6px 0 0; }
 .muted{ color: var(--muted); }
-.statusRow{ display:flex; justify-content:flex-end; }
+.statusRow{ display:none; }
 .status{ font-size: 12px; padding: 8px 10px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255,255,255,.06); }
 .status.ok{ border-color: rgba(39,192,125,.45); background: rgba(39,192,125,.12); color: rgba(39,192,125,.95); }
 .status.warn{ border-color: rgba(255,176,32,.55); background: rgba(255,176,32,.12); color: rgba(255,176,32,.95); }
