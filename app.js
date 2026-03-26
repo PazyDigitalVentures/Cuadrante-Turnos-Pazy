@@ -159,9 +159,10 @@ function renderCalendar(state) {
 
 function renderMeta(schedule) {
   const week = weekFrom(schedule.weekStart);
-  qs("metaWeek").textContent = `${week[0].iso} -> ${week[6].iso}`;
-  qs("metaGeneratedAt").textContent = new Date().toLocaleString("es-ES");
-  qs("subtitle").textContent = `${week[0].date.toLocaleDateString("es-ES")} hasta ${week[6].date.toLocaleDateString("es-ES")}`;
+  const fmt = (d) => d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const nice = `${fmt(week[0].date)} hasta ${fmt(week[6].date)}`;
+  qs("metaWeek").textContent = `${nice.charAt(0).toUpperCase()}${nice.slice(1)}`;
+  qs("subtitle").textContent = qs("metaWeek").textContent;
 }
 
 function renderPeople(people) {

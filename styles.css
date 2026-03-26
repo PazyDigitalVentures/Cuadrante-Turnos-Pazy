@@ -291,6 +291,11 @@ p{ margin:6px 0 0; }
 .metaItem{ display:flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 14px; border: 1px solid var(--border); background: rgba(255,255,255,.05); min-width: 220px; }
 .metaLabel{ font-size: 11px; color: var(--muted); }
 .metaValue{ font-weight: 800; }
+#metaWeek{
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: .2px;
+}
 
 .tableWrap{ overflow:auto; border-radius: 14px; border: 1px solid var(--border); }
 .scheduleTable{
