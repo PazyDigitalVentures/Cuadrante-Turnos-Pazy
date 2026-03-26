@@ -188,7 +188,8 @@ function makePeopleModel(rawPeople, vacationsByISO) {
 
 function availablePeopleForDate(peopleModel, iso) {
   const blocked = new Set((peopleModel.vacationsByISO?.[iso] || []).map(normalizeName));
-  return peopleModel.all.filter((n) => !blocked.has(n));
+  const excluded = getExcludedSet();
+  return peopleModel.all.filter((n) => !blocked.has(normalizeName(n)) && !excluded.has(normalizeName(n)));
 }
 
 function scheduleToRows(schedule) {
@@ -419,9 +420,10 @@ function apiBase() {
 async function apiCall(action, payload) {
   const base = apiBase();
   if (!base) throw new Error("Falta Web App URL.");
+  // Apps Script + GitHub Pages: evitamos preflight usando un Content-Type "simple".
   const res = await fetch(`${base}?action=${encodeURIComponent(action)}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "text/plain;charset=UTF-8" },
     body: JSON.stringify(payload || {}),
   });
   if (!res.ok) {
@@ -433,15 +435,113 @@ async function apiCall(action, payload) {
   return data;
 }
 
+function getExcludedSet() {
+  const cfg = localConfigGet();
+  const arr = Array.isArray(cfg.excludedPeople) ? cfg.excludedPeople : [];
+  return new Set(arr.map(normalizeName).filter(Boolean));
+}
+
+function setExcludedPeople(nextNames) {
+  const cfg = localConfigGet();
+  cfg.excludedPeople = sortNames(unique(nextNames.map(normalizeName).filter(Boolean)));
+  localConfigSet(cfg);
+}
+
 function renderPeopleList(peopleModel) {
   const wrap = qs("peopleList");
   wrap.innerHTML = "";
+  const excluded = getExcludedSet();
   for (const p of peopleModel.all) {
     const chip = document.createElement("div");
-    chip.className = "personChip";
+    chip.className = `personChip${excluded.has(normalizeName(p)) ? " off" : ""}`;
     chip.textContent = p;
     wrap.appendChild(chip);
   }
+}
+
+function renderExcludeControl(peopleModel) {
+  const el = document.getElementById("excludePeople");
+  if (!el) return;
+
+  const excluded = getExcludedSet();
+  el.innerHTML = "";
+  for (const name of peopleModel.all) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    opt.selected = excluded.has(normalizeName(name));
+    el.appendChild(opt);
+  }
+
+  el.onchange = () => {
+    const selected = Array.from(el.selectedOptions).map((o) => o.value);
+    setExcludedPeople(selected);
+    renderAll(window.__schedule, window.__peopleModel);
+  };
+}
+
+function renderVacationsThisWeek(vacationEvents) {
+  const el = document.getElementById("vacationsThisWeek");
+  if (!el) return;
+  const ev = Array.isArray(vacationEvents) ? vacationEvents : [];
+  if (!ev.length) {
+    el.textContent = "—";
+    return;
+  }
+  el.innerHTML = ev
+    .map((x) => `<div><strong>${escapeHtml(x.iso)}</strong>: ${escapeHtml((x.names || []).join(", "))}</div>`)
+    .join("");
+}
+
+function renderImagePreview(lastImage) {
+  const el = document.getElementById("imagePreview");
+  if (!el) return;
+  if (!lastImage?.previewUrl) {
+    el.textContent = "—";
+    return;
+  }
+  el.innerHTML = `
+    <img src="${escapeHtml(lastImage.previewUrl)}" alt="Imagen de turnos" />
+    <div class="imageActions">
+      <a class="linkBtn" href="${escapeHtml(lastImage.fileUrl || lastImage.previewUrl)}" target="_blank" rel="noreferrer">Abrir en Drive</a>
+      <span class="muted">${escapeHtml(lastImage.fileName || "")}</span>
+    </div>
+  `;
+}
+
+function renderMiniCalendar(weekStartISO) {
+  const el = document.getElementById("miniCalendar");
+  if (!el) return;
+  const ws = parseISODate(weekStartISO);
+  if (!ws) return;
+  const week = buildWeek(ws);
+  const inWeek = new Set(week.map((d) => d.iso));
+
+  const year = ws.getFullYear();
+  const month = ws.getMonth();
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
+  const startDow = (first.getDay() + 6) % 7; // lunes=0
+
+  const cells = [];
+  for (let i = 0; i < startDow; i++) cells.push({ empty: true });
+  for (let d = 1; d <= last.getDate(); d++) {
+    const dt = new Date(year, month, d);
+    const iso = toISODate(dt);
+    cells.push({ day: d, iso, inWeek: inWeek.has(iso) });
+  }
+  while (cells.length % 7 !== 0) cells.push({ empty: true });
+
+  const heads = ["L", "M", "X", "J", "V", "S", "D"];
+  el.innerHTML =
+    heads.map((h) => `<div class="calHead">${h}</div>`).join("") +
+    cells
+      .map((c) => {
+        if (c.empty) return `<div class="calCell off"></div>`;
+        const isThu = week[0].iso === c.iso;
+        return `<div class="calCell${c.inWeek ? " inWeek" : ""}${isThu ? " isThu" : ""}">${c.day}</div>`;
+      })
+      .join("");
 }
 
 function renderScheduleTable(schedule, peopleModel) {
@@ -493,6 +593,7 @@ function renderScheduleTable(schedule, peopleModel) {
             setSlot(schedule, id, { asignadoA: sel.value });
             renderSummary(schedule);
             refreshChangeSlotOptions(schedule);
+            if (typeof window.__autoSaveDebounced === "function") window.__autoSaveDebounced("edición");
           });
 
           td.appendChild(sel);
@@ -616,7 +717,7 @@ async function loadBootstrap(schedule) {
   const sheetId = clampStr(qs("sheetId").value);
   if (!sheetId) {
     setStatus("Falta Google Sheet ID. Puedes usar modo local por ahora.", "warn");
-    return { people: DEFAULT_PEOPLE, vacationsByISO: {}, changes: [], scheduleFromServer: null };
+    return { people: DEFAULT_PEOPLE, vacationsByISO: {}, vacationEvents: [], changes: [], scheduleFromServer: null };
   }
 
   try {
@@ -628,13 +729,14 @@ async function loadBootstrap(schedule) {
     return {
       people: (data.people || []).map(normalizeName).filter(Boolean),
       vacationsByISO: data.vacationsByISO || {},
+      vacationEvents: data.vacationEvents || [],
       changes: data.changes || [],
       scheduleFromServer: data.schedule || null,
       config: data.config || null,
     };
   } catch (e) {
     setStatus(`No se pudo cargar de Sheets: ${e.message}. Usando modo local.`, "warn");
-    return { people: DEFAULT_PEOPLE, vacationsByISO: {}, changes: [], scheduleFromServer: null };
+    return { people: DEFAULT_PEOPLE, vacationsByISO: {}, vacationEvents: [], changes: [], scheduleFromServer: null };
   }
 }
 
@@ -677,6 +779,8 @@ function renderAll(schedule, peopleModel) {
   window.__peopleModel = peopleModel;
   updateMeta(schedule);
   renderPeopleList(peopleModel);
+  renderExcludeControl(peopleModel);
+  renderMiniCalendar(schedule.weekStart);
   renderScheduleTable(schedule, peopleModel);
   renderSummary(schedule);
   refreshChangeSlotOptions(schedule);
@@ -742,6 +846,27 @@ function init() {
 
   let schedule = createEmptySchedule(weekStart);
   let changes = [];
+  let lastImage = null;
+
+  const autoSave = async (reason) => {
+    const hasIntegration = Boolean(clampStr(qs("webAppUrl").value) && clampStr(qs("sheetId").value));
+    if (!hasIntegration) return;
+    try {
+      setStatus(`Guardando… (${reason})`, "muted");
+      await saveToSheets(schedule, changes);
+      setStatus("Guardado.", "ok");
+    } catch (e) {
+      setStatus(`No se pudo guardar: ${e.message}`, "bad");
+    }
+  };
+  const autoSaveDebounced = (() => {
+    let t = null;
+    return (reason) => {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => autoSave(reason), 900);
+    };
+  })();
+  window.__autoSaveDebounced = autoSaveDebounced;
 
   const updateIntegrationButtons = () => {
     const hasIntegration = Boolean(clampStr(qs("webAppUrl").value) && clampStr(qs("sheetId").value));
@@ -782,6 +907,8 @@ function init() {
     }));
 
     renderAll(schedule, peopleModel);
+    renderVacationsThisWeek(boot.vacationEvents);
+    renderImagePreview(lastImage);
     wireTodosToggles(schedule);
     renderChangesHistory(changes);
     setStatus("Cargado.", "ok");
@@ -851,6 +978,7 @@ function init() {
     renderAll(schedule, window.__peopleModel);
     renderChangesHistory(changes);
     setStatus("Cambio aplicado.", "ok");
+    autoSaveDebounced("cambio");
   };
 
   // Botón legacy (si existiera en versiones anteriores)
@@ -876,6 +1004,8 @@ function init() {
     try {
       setStatus("Generando PNG y subiendo a Drive…", "muted");
       const data = await saveImageToDrive(schedule);
+      lastImage = data;
+      renderImagePreview(lastImage);
       setStatus(`Imagen subida a Drive. Archivo: ${data.fileName}`, "ok");
       if (data.fileUrl) {
         // Mostrar enlace de forma sencilla sin romper el layout
@@ -898,6 +1028,7 @@ function init() {
       } else {
         setStatus("Turnos generados.", "ok");
       }
+      autoSaveDebounced("auto");
     } catch (e) {
       setStatus(`No se pudo generar: ${e.message}`, "bad");
     }

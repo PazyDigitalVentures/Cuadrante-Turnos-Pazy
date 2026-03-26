@@ -51,6 +51,16 @@
                 <button id="btnSaveImage" class="btn primary" type="button">Guardar imagen</button>
               </div>
             </div>
+            <div class="row rowTight">
+              <div class="control wide">
+                <label for="excludePeople">Excluir del reparto (selección múltiple)</label>
+                <select id="excludePeople" multiple></select>
+              </div>
+              <div class="vacBox">
+                <div class="vacTitle">Vacaciones esta semana</div>
+                <div id="vacationsThisWeek" class="vacList muted">—</div>
+              </div>
+            </div>
           </div>
 
           <details class="card cardTight integrationCard">
@@ -75,6 +85,28 @@
               </div>
             </div>
           </details>
+        </section>
+
+        <section class="gridTop">
+          <section class="card cardTight">
+            <div class="cardHeader">
+              <div>
+                <h2>Calendario</h2>
+                <p class="muted">Semana marcada (jueves → miércoles).</p>
+              </div>
+            </div>
+            <div id="miniCalendar" class="miniCalendar" aria-label="Calendario del mes"></div>
+          </section>
+
+          <section class="card cardTight">
+            <div class="cardHeader">
+              <div>
+                <h2>Imagen</h2>
+                <p class="muted">Última imagen guardada.</p>
+              </div>
+            </div>
+            <div id="imagePreview" class="imagePreview muted">—</div>
+          </section>
         </section>
 
         <section class="card">

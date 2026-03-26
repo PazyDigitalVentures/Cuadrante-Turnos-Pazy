@@ -92,6 +92,69 @@ body{
   justify-content: space-between;
   flex-wrap: wrap;
 }
+.rowTight{ margin-top: 10px; align-items:flex-start; }
+.control.wide{ min-width: 420px; flex: 1; }
+select[multiple]{ height: 112px; padding: 10px; }
+
+.vacBox{
+  min-width: 260px;
+  flex: 1;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.04);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.vacTitle{ font-size: 12px; font-weight: 800; color: var(--muted); margin-bottom: 6px; }
+.vacList{ font-size: 13px; line-height: 1.35; }
+
+.miniCalendar{
+  display:grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+.calHead{
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--muted);
+  text-align:center;
+  padding: 6px 0;
+}
+.calCell{
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.04);
+  border-radius: 12px;
+  min-height: 44px;
+  padding: 8px 10px;
+  font-weight: 800;
+  display:flex;
+  align-items:flex-start;
+  justify-content:flex-start;
+}
+.calCell.off{ opacity:.45; }
+.calCell.inWeek{
+  border-color: rgba(0,198,204,.55);
+  box-shadow: 0 0 0 4px var(--pazySoft);
+}
+.calCell.isThu{
+  background: rgba(0,198,204,.14);
+}
+
+.imagePreview{
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255,255,255,.04);
+  padding: 12px;
+  overflow:hidden;
+}
+.imagePreview img{
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  display:block;
+}
+.imageActions{ display:flex; gap:10px; margin-top: 10px; align-items:center; flex-wrap:wrap; }
+.linkBtn{ font-weight: 800; color: var(--text); text-decoration: none; border: 1px solid var(--border); padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,.04); }
+.linkBtn:hover{ filter: brightness(1.06); }
 
 .cardTight{ padding: 14px; }
 
