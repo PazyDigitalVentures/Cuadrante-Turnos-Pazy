@@ -298,17 +298,23 @@ function generate(schedule, state) {
 }
 
 async function saveImage(schedule) {
-  const canvas = await html2canvas(qs("scheduleCapture"), {
-    backgroundColor: "#ffffff",
-    scale: Math.min(2, window.devicePixelRatio || 1),
-    useCORS: true,
-  });
-  const a = document.createElement("a");
-  a.href = canvas.toDataURL("image/png");
-  a.download = `Turnos_${schedule.weekStart}_${Date.now()}.png`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  const target = qs("scheduleCapture");
+  target.classList.add("export-clean");
+  try {
+    const canvas = await html2canvas(target, {
+      backgroundColor: "#ffffff",
+      scale: Math.max(2, Math.min(3, window.devicePixelRatio || 2)),
+      useCORS: true,
+    });
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    a.download = `Turnos_${schedule.weekStart}_${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    target.classList.remove("export-clean");
+  }
 }
 
 function init() {

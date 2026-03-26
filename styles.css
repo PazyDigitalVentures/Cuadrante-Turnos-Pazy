@@ -301,6 +301,35 @@ p{ margin:6px 0 0; }
   border-radius: var(--radius2);
   padding: 14px;
 }
+
+/* Modo limpio para exportar PNG sin brillos/velos */
+#scheduleCapture.export-clean{
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #d1d5db !important;
+  box-shadow: none !important;
+}
+#scheduleCapture.export-clean *{
+  color: #0f172a !important;
+  text-shadow: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
+#scheduleCapture.export-clean .scheduleTable{
+  background: #ffffff !important;
+}
+#scheduleCapture.export-clean .scheduleTable thead th{
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+}
+#scheduleCapture.export-clean .typePill.fijo{
+  background: #dff6f8 !important;
+  border-color: #7dd3dc !important;
+}
+#scheduleCapture.export-clean .typePill.backup{
+  background: #ffe9df !important;
+  border-color: #fdba74 !important;
+}
 .scheduleMeta{
   display:flex;
   gap: 12px;
