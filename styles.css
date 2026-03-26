@@ -296,7 +296,8 @@ p{ margin:6px 0 0; }
 
 .capture{
   border: 1px solid var(--border);
-  background: rgba(255,255,255,.04);
+  background: #ffffff;
+  color: #0f172a;
   border-radius: var(--radius2);
   padding: 14px;
 }
@@ -322,7 +323,7 @@ p{ margin:6px 0 0; }
   width: 100%;
   border-collapse: collapse;
   min-width: 980px;
-  background: rgba(0,0,0,.08);
+  background: #ffffff;
 }
 @media (prefers-color-scheme: light){
   .scheduleTable{ background: rgba(255,255,255,.7); }
@@ -335,13 +336,12 @@ p{ margin:6px 0 0; }
 .scheduleTable thead th{
   position: sticky;
   top: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
-  backdrop-filter: blur(8px);
+  background: #f8fafc;
   z-index: 1;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: .6px;
-  color: var(--muted);
+  color: #475569;
 }
 .colDay{ width: 190px; }
 .colType{ width: 120px; }

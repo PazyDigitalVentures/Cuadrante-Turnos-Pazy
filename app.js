@@ -162,7 +162,6 @@ function renderMeta(schedule) {
   const fmt = (d) => d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const nice = `${fmt(week[0].date)} hasta ${fmt(week[6].date)}`;
   qs("metaWeek").textContent = `${nice.charAt(0).toUpperCase()}${nice.slice(1)}`;
-  qs("subtitle").textContent = qs("metaWeek").textContent;
 }
 
 function renderPeople(people) {
@@ -299,7 +298,11 @@ function generate(schedule, state) {
 }
 
 async function saveImage(schedule) {
-  const canvas = await html2canvas(qs("scheduleCapture"), { backgroundColor: null, scale: Math.min(2, window.devicePixelRatio || 1), useCORS: true });
+  const canvas = await html2canvas(qs("scheduleCapture"), {
+    backgroundColor: "#ffffff",
+    scale: Math.min(2, window.devicePixelRatio || 1),
+    useCORS: true,
+  });
   const a = document.createElement("a");
   a.href = canvas.toDataURL("image/png");
   a.download = `Turnos_${schedule.weekStart}_${Date.now()}.png`;
