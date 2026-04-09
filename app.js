@@ -71,7 +71,15 @@ function emptySchedule(weekStart) {
     for (const f of FRANJAS) {
       for (const t of TIPOS) {
         const id = slotId(d.iso, f.key, t.key);
-        out.slots[id] = { id, fecha: d.iso, franja: f.key, tipo: t.key, modo: "NORMAL", asignadoA: "" };
+        const forceTodosMorning = f.key === "MANANA" && [1, 2, 3, 4, 5].includes(d.date.getDay());
+        out.slots[id] = {
+          id,
+          fecha: d.iso,
+          franja: f.key,
+          tipo: t.key,
+          modo: forceTodosMorning ? "TODOS" : "NORMAL",
+          asignadoA: "",
+        };
       }
     }
   }
@@ -274,6 +282,16 @@ function generate(schedule, state) {
   const seed = (Date.now() ^ Math.floor(Math.random() * 1e9) ^ (state.generationCounter * 2654435761)) >>> 0;
   const rng = mulberry32(seed);
   const stats = new Map(state.people.map((p) => [p, { total: 0, byFranja: { MANANA: 0, TARDE: 0, NOCHE: 0 }, fijo: 0, backup: 0 }]));
+  for (const day of weekFrom(schedule.weekStart)) {
+    const isWorkdayMorningByDefault = [1, 2, 3, 4, 5].includes(day.date.getDay());
+    if (!isWorkdayMorningByDefault) continue;
+    for (const tipo of TIPOS) {
+      const id = slotId(day.iso, "MANANA", tipo.key);
+      const cur = schedule.slots[id];
+      if (!cur) continue;
+      schedule.slots[id] = { ...cur, modo: "TODOS", asignadoA: "" };
+    }
+  }
   for (const s of Object.values(schedule.slots)) if (s.modo !== "TODOS") s.asignadoA = "";
   for (const day of weekFrom(schedule.weekStart)) {
     const usedToday = new Set();
