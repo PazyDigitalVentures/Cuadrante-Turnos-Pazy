@@ -529,7 +529,6 @@ function init() {
   state.schedulesByWeek = state.schedulesByWeek || {};
 
   qs("weekStart").value = state.weekStart;
-  qs("vacAutoUrl").value = state.vacAutoUrl;
   let schedule = state.schedulesByWeek[state.weekStart] || emptySchedule(state.weekStart);
 
   const persist = (reason) => {
@@ -601,15 +600,9 @@ function init() {
     persist("vacaciones");
   });
 
-  qs("vacAutoUrl").addEventListener("change", () => {
-    state.vacAutoUrl = clamp(qs("vacAutoUrl").value) || DEFAULT_VAC_SHEET_URL;
-    qs("vacAutoUrl").value = state.vacAutoUrl;
-    saveState(state);
-  });
-
   qs("btnSyncVacations").addEventListener("click", async () => {
     try {
-      const rawUrl = clamp(qs("vacAutoUrl").value) || state.vacAutoUrl || DEFAULT_VAC_SHEET_URL;
+      const rawUrl = state.vacAutoUrl || DEFAULT_VAC_SHEET_URL;
       const csvUrl = csvUrlFromSheetUrl(rawUrl);
       if (!csvUrl) {
         status("URL de Google Sheets no válida.", "warn");
@@ -624,7 +617,6 @@ function init() {
       const manualRanges = state.vacationRanges.filter((r) => (r.source || "manual") !== "auto");
       state.vacationRanges = [...manualRanges, ...autoRanges];
       state.vacAutoUrl = rawUrl;
-      qs("vacAutoUrl").value = rawUrl;
       rerender();
       persist("vacaciones auto");
       status(`Vacaciones automáticas actualizadas (${autoRanges.length} rangos).`, "ok");
