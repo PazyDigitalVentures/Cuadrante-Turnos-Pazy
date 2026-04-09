@@ -10,10 +10,10 @@
       href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260326v" />
+    <link rel="stylesheet" href="./styles.css?v=20260326w" />
     <meta name="color-scheme" content="light dark" />
     <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <script defer src="./app.js?v=20260326t"></script>
+    <script defer src="./app.js?v=20260326w"></script>
   </head>
   <body>
     <div class="app">
@@ -75,6 +75,21 @@
               <div>
                 <h2>Vacaciones</h2>
                 <p class="muted">Selecciona persona y rango. Si acaba domingo, desde lunes vuelve a entrar en el reparto.</p>
+              </div>
+            </div>
+            <div class="row rowTight compactRow">
+              <div class="control wide">
+                <label for="vacAutoUrl">URL hoja Google (lectura)</label>
+                <input
+                  id="vacAutoUrl"
+                  type="url"
+                  placeholder="https://docs.google.com/spreadsheets/d/.../edit?usp=sharing"
+                />
+              </div>
+            </div>
+            <div class="row rowTight compactRow">
+              <div class="actions">
+                <button id="btnSyncVacations" class="btn" type="button">Actualizar vacaciones de forma automática</button>
               </div>
             </div>
             <div class="row rowTight compactRow">

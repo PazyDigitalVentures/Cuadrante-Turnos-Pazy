@@ -38,10 +38,170 @@ const NAME_FIX = {
   "Inigo Puyol": "Iñigo Puyol",
   "Magui Cerda": "Magui Cerdá",
 };
+const DEFAULT_VAC_SHEET_URL = "https://docs.google.com/spreadsheets/d/1eAFz2aAyk57GBtax1GEOEVTZMRVUFUI0WjECzz3PmnM/edit?usp=sharing";
+const MONTH_MAP = {
+  ene: 0, enero: 0,
+  feb: 1, febrero: 1,
+  mar: 2, marzo: 2,
+  abr: 3, abril: 3,
+  may: 4, mayo: 4,
+  jun: 5, junio: 5,
+  jul: 6, julio: 6,
+  ago: 7, agosto: 7,
+  sep: 8, set: 8, septiembre: 8, setiembre: 8,
+  oct: 9, octubre: 9,
+  nov: 10, noviembre: 10,
+  dic: 11, diciembre: 11,
+};
 
 function fixName(s) {
   const n = norm(s);
   return NAME_FIX[n] || n;
+}
+
+function normalizeKey(s) {
+  return norm(s)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function parseSheetRef(url) {
+  const m = String(url || "").match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!m) return null;
+  const sheetId = m[1];
+  const gidMatch = String(url).match(/[?&]gid=(\d+)/);
+  const gid = gidMatch ? gidMatch[1] : "0";
+  return { sheetId, gid };
+}
+
+function csvUrlFromSheetUrl(url) {
+  const ref = parseSheetRef(url);
+  if (!ref) return null;
+  return `https://docs.google.com/spreadsheets/d/${ref.sheetId}/gviz/tq?tqx=out:csv&gid=${ref.gid}`;
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cur = "";
+  let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') {
+      if (inQ && text[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQ = !inQ;
+      }
+      continue;
+    }
+    if (ch === "," && !inQ) {
+      row.push(cur);
+      cur = "";
+      continue;
+    }
+    if ((ch === "\n" || ch === "\r") && !inQ) {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(cur);
+      rows.push(row);
+      row = [];
+      cur = "";
+      continue;
+    }
+    cur += ch;
+  }
+  row.push(cur);
+  rows.push(row);
+  return rows;
+}
+
+function normalizeCellForVac(s) {
+  return normalizeKey(s).replace(/\./g, "");
+}
+
+function buildDateColumns(grid, baseYear) {
+  const monthRow = grid[11] || [];
+  const dayRow = grid[13] || [];
+  const out = [];
+  let lastMonth = -1;
+  let year = baseYear;
+  for (let c = 0; c < Math.max(monthRow.length, dayRow.length); c++) {
+    const rawMonth = normalizeCellForVac(monthRow[c] || "");
+    const dayNum = Number(String(dayRow[c] || "").replace(/[^\d]/g, ""));
+    if (!rawMonth || !Number.isInteger(dayNum) || dayNum < 1 || dayNum > 31) continue;
+    const monthIdx = MONTH_MAP[rawMonth];
+    if (monthIdx == null) continue;
+    if (lastMonth !== -1 && monthIdx < lastMonth) year += 1;
+    lastMonth = monthIdx;
+    out.push({ c, iso: `${year}-${String(monthIdx + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}` });
+  }
+  return out;
+}
+
+function compactRanges(sortedIsos) {
+  if (!sortedIsos.length) return [];
+  const out = [];
+  let from = sortedIsos[0];
+  let prev = sortedIsos[0];
+  for (let i = 1; i < sortedIsos.length; i++) {
+    const cur = sortedIsos[i];
+    const expected = toISO(addDays(parseISO(prev), 1));
+    if (cur !== expected) {
+      out.push({ from, to: prev });
+      from = cur;
+    }
+    prev = cur;
+  }
+  out.push({ from, to: prev });
+  return out;
+}
+
+function applyAdjacentWeekendRule(isoSet) {
+  const extra = new Set();
+  for (const iso of isoSet) {
+    const dt = parseISO(iso);
+    if (!dt) continue;
+    const day = dt.getDay();
+    if (day === 5) {
+      extra.add(toISO(addDays(dt, 1)));
+      extra.add(toISO(addDays(dt, 2)));
+    }
+    if (day === 1) {
+      extra.add(toISO(addDays(dt, -1)));
+      extra.add(toISO(addDays(dt, -2)));
+    }
+  }
+  for (const iso of extra) isoSet.add(iso);
+}
+
+function extractAutoVacationRanges(csvText, people, baseYear) {
+  const grid = parseCsv(csvText);
+  if (!grid.length) return [];
+  const columns = buildDateColumns(grid, baseYear);
+  if (!columns.length) return [];
+  const allowedByKey = new Map(people.map((p) => [normalizeKey(p), p]));
+  const personDays = new Map(people.map((p) => [p, new Set()]));
+  for (let r = 14; r < grid.length; r++) {
+    const nameCell = fixName(grid[r]?.[2] || "");
+    const name = allowedByKey.get(normalizeKey(nameCell));
+    if (!name) continue;
+    for (const col of columns) {
+      const cell = normalizeCellForVac(grid[r]?.[col.c] || "");
+      if (cell === "v") personDays.get(name).add(col.iso);
+    }
+  }
+  const ranges = [];
+  for (const [person, setDays] of personDays.entries()) {
+    if (!setDays.size) continue;
+    applyAdjacentWeekendRule(setDays);
+    const sorted = [...setDays].sort();
+    for (const rg of compactRanges(sorted)) {
+      ranges.push({ person, from: rg.from, to: rg.to, source: "auto" });
+    }
+  }
+  return ranges;
 }
 
 function computeThursday(isoDate) {
@@ -95,13 +255,22 @@ function loadState() {
       monthOffset: Number(parsed.monthOffset || 0),
       generationCounter: Number(parsed.generationCounter || 0),
       people: sortNames(uniq((parsed.people || DEFAULT_PEOPLE).map(fixName).filter(Boolean))),
+      vacAutoUrl: clamp(parsed.vacAutoUrl || DEFAULT_VAC_SHEET_URL),
       vacationRanges: Array.isArray(parsed.vacationRanges)
-        ? parsed.vacationRanges.map((r) => ({ ...r, person: fixName(r.person) }))
+        ? parsed.vacationRanges.map((r) => ({ ...r, person: fixName(r.person), source: r.source || "manual" }))
         : [],
       schedulesByWeek: parsed.schedulesByWeek || {},
     };
   } catch {
-    return { weekStart: computeThursday(), monthOffset: 0, generationCounter: 0, people: DEFAULT_PEOPLE, vacationRanges: [], schedulesByWeek: {} };
+    return {
+      weekStart: computeThursday(),
+      monthOffset: 0,
+      generationCounter: 0,
+      people: DEFAULT_PEOPLE,
+      vacAutoUrl: DEFAULT_VAC_SHEET_URL,
+      vacationRanges: [],
+      schedulesByWeek: {},
+    };
   }
 }
 
@@ -352,11 +521,15 @@ function init() {
   const state = loadState();
   state.weekStart = computeThursday(state.weekStart);
   state.monthOffset = Number(state.monthOffset || 0);
-  state.people = sortNames(uniq((state.people || DEFAULT_PEOPLE).map(norm).filter(Boolean)));
-  state.vacationRanges = Array.isArray(state.vacationRanges) ? state.vacationRanges : [];
+  state.people = sortNames(uniq((state.people || DEFAULT_PEOPLE).map(fixName).filter(Boolean)));
+  state.vacAutoUrl = clamp(state.vacAutoUrl || DEFAULT_VAC_SHEET_URL);
+  state.vacationRanges = Array.isArray(state.vacationRanges)
+    ? state.vacationRanges.map((r) => ({ ...r, person: fixName(r.person), source: r.source || "manual" }))
+    : [];
   state.schedulesByWeek = state.schedulesByWeek || {};
 
   qs("weekStart").value = state.weekStart;
+  qs("vacAutoUrl").value = state.vacAutoUrl;
   let schedule = state.schedulesByWeek[state.weekStart] || emptySchedule(state.weekStart);
 
   const persist = (reason) => {
@@ -423,9 +596,41 @@ function init() {
       status("Selecciona comercial y rango de fechas.", "warn");
       return;
     }
-    state.vacationRanges.push({ person, from, to });
+    state.vacationRanges.push({ person: fixName(person), from, to, source: "manual" });
     rerender();
     persist("vacaciones");
+  });
+
+  qs("vacAutoUrl").addEventListener("change", () => {
+    state.vacAutoUrl = clamp(qs("vacAutoUrl").value) || DEFAULT_VAC_SHEET_URL;
+    qs("vacAutoUrl").value = state.vacAutoUrl;
+    saveState(state);
+  });
+
+  qs("btnSyncVacations").addEventListener("click", async () => {
+    try {
+      const rawUrl = clamp(qs("vacAutoUrl").value) || state.vacAutoUrl || DEFAULT_VAC_SHEET_URL;
+      const csvUrl = csvUrlFromSheetUrl(rawUrl);
+      if (!csvUrl) {
+        status("URL de Google Sheets no válida.", "warn");
+        return;
+      }
+      status("Leyendo vacaciones automáticas...", "warn");
+      const res = await fetch(csvUrl, { method: "GET" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const csvText = await res.text();
+      const year = parseISO(state.weekStart)?.getFullYear() || new Date().getFullYear();
+      const autoRanges = extractAutoVacationRanges(csvText, state.people, year);
+      const manualRanges = state.vacationRanges.filter((r) => (r.source || "manual") !== "auto");
+      state.vacationRanges = [...manualRanges, ...autoRanges];
+      state.vacAutoUrl = rawUrl;
+      qs("vacAutoUrl").value = rawUrl;
+      rerender();
+      persist("vacaciones auto");
+      status(`Vacaciones automáticas actualizadas (${autoRanges.length} rangos).`, "ok");
+    } catch (e) {
+      status(`No se pudo actualizar vacaciones automáticas: ${e.message}`, "bad");
+    }
   });
 
   qs("btnRemoveVacation").addEventListener("click", () => {
