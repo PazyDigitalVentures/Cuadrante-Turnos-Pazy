@@ -121,23 +121,81 @@ function normalizeCellForVac(s) {
   return normalizeKey(s).replace(/\./g, "");
 }
 
+function countMonthTokens(row) {
+  return row.reduce((acc, cell) => (MONTH_MAP[normalizeCellForVac(cell)] != null ? acc + 1 : acc), 0);
+}
+
+function countDayTokens(row) {
+  return row.reduce((acc, cell) => {
+    const n = Number(String(cell || "").replace(/[^\d]/g, ""));
+    return Number.isInteger(n) && n >= 1 && n <= 31 ? acc + 1 : acc;
+  }, 0);
+}
+
+function detectDateRows(grid) {
+  let monthRowIdx = -1;
+  let bestMonthScore = 0;
+  for (let r = 0; r < grid.length; r++) {
+    const score = countMonthTokens(grid[r] || []);
+    if (score > bestMonthScore) {
+      bestMonthScore = score;
+      monthRowIdx = r;
+    }
+  }
+  if (monthRowIdx < 0 || bestMonthScore < 1) return null;
+  let dayRowIdx = -1;
+  let bestDayScore = 0;
+  for (let r = monthRowIdx; r < Math.min(grid.length, monthRowIdx + 6); r++) {
+    const score = countDayTokens(grid[r] || []);
+    if (score > bestDayScore) {
+      bestDayScore = score;
+      dayRowIdx = r;
+    }
+  }
+  if (dayRowIdx < 0 || bestDayScore < 5) return null;
+  return { monthRowIdx, dayRowIdx };
+}
+
 function buildDateColumns(grid, baseYear) {
-  const monthRow = grid[11] || [];
-  const dayRow = grid[13] || [];
+  const rows = detectDateRows(grid);
+  if (!rows) return { columns: [], dayRowIdx: -1 };
+  const monthRow = grid[rows.monthRowIdx] || [];
+  const dayRow = grid[rows.dayRowIdx] || [];
   const out = [];
   let lastMonth = -1;
+  let currentMonth = -1;
   let year = baseYear;
   for (let c = 0; c < Math.max(monthRow.length, dayRow.length); c++) {
     const rawMonth = normalizeCellForVac(monthRow[c] || "");
+    if (MONTH_MAP[rawMonth] != null) currentMonth = MONTH_MAP[rawMonth];
     const dayNum = Number(String(dayRow[c] || "").replace(/[^\d]/g, ""));
-    if (!rawMonth || !Number.isInteger(dayNum) || dayNum < 1 || dayNum > 31) continue;
-    const monthIdx = MONTH_MAP[rawMonth];
+    if (currentMonth < 0 || !Number.isInteger(dayNum) || dayNum < 1 || dayNum > 31) continue;
+    const monthIdx = currentMonth;
     if (monthIdx == null) continue;
     if (lastMonth !== -1 && monthIdx < lastMonth) year += 1;
     lastMonth = monthIdx;
     out.push({ c, iso: `${year}-${String(monthIdx + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}` });
   }
-  return out;
+  return { columns: out, dayRowIdx: rows.dayRowIdx };
+}
+
+function detectNameColumn(grid, dayRowIdx, people) {
+  const allowed = new Set(people.map((p) => normalizeKey(p)));
+  let bestCol = 2;
+  let bestScore = -1;
+  const maxCols = Math.max(...grid.map((r) => r.length), 0);
+  for (let c = 0; c < maxCols; c++) {
+    let score = 0;
+    for (let r = Math.max(0, dayRowIdx + 1); r < grid.length; r++) {
+      const cell = normalizeKey(fixName(grid[r]?.[c] || ""));
+      if (allowed.has(cell)) score++;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestCol = c;
+    }
+  }
+  return { nameCol: bestCol, nameHits: bestScore };
 }
 
 function compactRanges(sortedIsos) {
@@ -179,12 +237,14 @@ function applyAdjacentWeekendRule(isoSet) {
 function extractAutoVacationRanges(csvText, people, baseYear) {
   const grid = parseCsv(csvText);
   if (!grid.length) return [];
-  const columns = buildDateColumns(grid, baseYear);
+  const { columns, dayRowIdx } = buildDateColumns(grid, baseYear);
   if (!columns.length) return [];
+  const { nameCol, nameHits } = detectNameColumn(grid, dayRowIdx, people);
+  if (nameHits < 1) return [];
   const allowedByKey = new Map(people.map((p) => [normalizeKey(p), p]));
   const personDays = new Map(people.map((p) => [p, new Set()]));
-  for (let r = 14; r < grid.length; r++) {
-    const nameCell = fixName(grid[r]?.[2] || "");
+  for (let r = Math.max(0, dayRowIdx + 1); r < grid.length; r++) {
+    const nameCell = fixName(grid[r]?.[nameCol] || "");
     const name = allowedByKey.get(normalizeKey(nameCell));
     if (!name) continue;
     for (const col of columns) {
@@ -293,6 +353,7 @@ function vacationsByISO(state) {
       cur = addDays(cur, 1);
     }
   }
+  for (const iso of Object.keys(map)) map[iso] = uniq(map[iso]).sort((a, b) => a.localeCompare(b, "es"));
   return map;
 }
 
