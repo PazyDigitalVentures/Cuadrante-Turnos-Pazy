@@ -410,8 +410,9 @@ function renderCalendar(state) {
 function renderMeta(schedule) {
   const week = weekFrom(schedule.weekStart);
   const fmt = (d) => d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  const nice = `${fmt(week[0].date)} hasta ${fmt(week[6].date)}`;
-  qs("metaWeek").textContent = `${nice.charAt(0).toUpperCase()}${nice.slice(1)}`;
+  const a = `${fmt(week[0].date).charAt(0).toUpperCase()}${fmt(week[0].date).slice(1)}`;
+  const b = `${fmt(week[6].date).charAt(0).toUpperCase()}${fmt(week[6].date).slice(1)}`;
+  qs("metaWeek").innerHTML = `<span class="metaWeekLine">${escapeHtml(a)}</span><span class="metaWeekMid">hasta</span><span class="metaWeekLine">${escapeHtml(b)}</span>`;
 }
 
 function renderPeople(people) {
@@ -471,7 +472,11 @@ function renderTable(schedule, state, onChange) {
         sel.className = "slotSelect";
         sel.appendChild(new Option("—", ""));
         sel.appendChild(new Option("TODOS", "__TODOS__"));
-        for (const p of availableForDate(state.people, vacMap, day.iso)) sel.appendChild(new Option(p, p));
+        const blockedToday = new Set((vacMap[day.iso] || []).map(norm));
+        for (const p of state.people) {
+          const label = blockedToday.has(norm(p)) ? `${p} (vacaciones)` : p;
+          sel.appendChild(new Option(label, p));
+        }
         sel.value = cur.modo === "TODOS" ? "__TODOS__" : (cur.asignadoA || "");
         sel.addEventListener("change", () => {
           if (sel.value === "__TODOS__") schedule.slots[id] = { ...cur, modo: "TODOS", asignadoA: "" };
