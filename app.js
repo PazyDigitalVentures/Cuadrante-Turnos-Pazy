@@ -771,7 +771,6 @@ function init() {
 
   qs("weekStart").value = state.weekStart;
   qs("vacAutoUrl").value = state.vacAutoUrl;
-  let pendingVacImageFile = null;
   let schedule = state.schedulesByWeek[state.weekStart] || emptySchedule(state.weekStart);
 
   const persist = (reason) => {
@@ -849,33 +848,22 @@ function init() {
     saveState(state);
   });
 
-  const runAutoVacationSync = async ({ fromImage = false } = {}) => {
-    if (fromImage && !pendingVacImageFile) {
-      alert("Selecciona una imagen primero.");
-      return;
-    }
+  const runAutoVacationSync = async () => {
     try {
       const year = parseISO(state.weekStart)?.getFullYear() || new Date().getFullYear();
-      let autoRanges = [];
-      if (fromImage) {
-        status("Analizando imagen de vacaciones...", "warn");
-        qs("btnSyncVacations").disabled = true;
-        autoRanges = await extractAutoVacationRangesFromImage(pendingVacImageFile, state.people, year);
-      } else {
-        const rawUrl = clamp(qs("vacAutoUrl").value) || state.vacAutoUrl || DEFAULT_VAC_SHEET_URL;
-        const csvUrl = csvUrlFromSheetUrl(rawUrl);
-        if (!csvUrl) {
-          status("URL de Google Sheets no válida.", "warn");
-          return;
-        }
-        status("Leyendo vacaciones automáticas...", "warn");
-        const res = await fetch(csvUrl, { method: "GET" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const csvText = await res.text();
-        autoRanges = extractAutoVacationRanges(csvText, state.people, year);
-        state.vacAutoUrl = rawUrl;
-        qs("vacAutoUrl").value = rawUrl;
+      const rawUrl = clamp(qs("vacAutoUrl").value) || state.vacAutoUrl || DEFAULT_VAC_SHEET_URL;
+      const csvUrl = csvUrlFromSheetUrl(rawUrl);
+      if (!csvUrl) {
+        status("URL de Google Sheets no válida.", "warn");
+        return;
       }
+      status("Leyendo vacaciones automáticas...", "warn");
+      const res = await fetch(csvUrl, { method: "GET" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const csvText = await res.text();
+      const autoRanges = extractAutoVacationRanges(csvText, state.people, year);
+      state.vacAutoUrl = rawUrl;
+      qs("vacAutoUrl").value = rawUrl;
       const manualRanges = state.vacationRanges.filter((r) => (r.source || "manual") !== "auto");
       state.vacationRanges = [...manualRanges, ...autoRanges];
       rerender();
@@ -889,23 +877,11 @@ function init() {
       alert(msg);
     } finally {
       qs("btnSyncVacations").disabled = false;
-      if (fromImage) {
-        pendingVacImageFile = null;
-        qs("vacImageFile").value = "";
-      }
     }
   };
 
   qs("btnSyncVacations").addEventListener("click", async () => {
-    await runAutoVacationSync({ fromImage: Boolean(pendingVacImageFile) });
-  });
-
-  qs("btnImportVacImage").addEventListener("click", () => qs("vacImageFile").click());
-  qs("vacImageFile").addEventListener("change", async () => {
-    const file = qs("vacImageFile").files?.[0];
-    if (!file) return;
-    pendingVacImageFile = file;
-    await runAutoVacationSync({ fromImage: true });
+    await runAutoVacationSync();
   });
 
   qs("btnRemoveVacation").addEventListener("click", () => {
