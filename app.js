@@ -290,13 +290,45 @@ function parseIsoFlexible(value) {
   const raw = clamp(value);
   const ymd = raw.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
   if (ymd) return `${ymd[1]}-${ymd[2]}-${ymd[3]}`;
+  const gvizDate = raw.match(/Date\((\d{4}),\s*(\d{1,2}),\s*(\d{1,2})\)/i);
+  if (gvizDate) {
+    const y = Number(gvizDate[1]);
+    const m = Number(gvizDate[2]) + 1;
+    const d = Number(gvizDate[3]);
+    return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
   const dt = new Date(raw);
   if (!Number.isNaN(dt.getTime())) return toISO(dt);
   return "";
 }
 
+function parseExportGrid(rawText) {
+  const text = String(rawText || "");
+  if (!text.includes("google.visualization.Query.setResponse(")) {
+    return parseCsv(text);
+  }
+  const m = text.match(/setResponse\(([\s\S]+)\);?\s*$/);
+  if (!m) return [];
+  let payload;
+  try {
+    payload = JSON.parse(m[1]);
+  } catch {
+    return [];
+  }
+  const rows = payload?.table?.rows || [];
+  const out = [["Nombre", "Fecha", "Tipo"]];
+  for (const r of rows) {
+    const c = r?.c || [];
+    const name = c[0]?.v ?? "";
+    const fecha = c[1]?.f ?? c[1]?.v ?? "";
+    const tipo = c[2]?.v ?? "";
+    out.push([String(name), String(fecha), String(tipo)]);
+  }
+  return out;
+}
+
 function extractAutoVacationRangesFromExportTable(rawText, people, fromIso, toIso) {
-  const grid = parseCsv(rawText);
+  const grid = parseExportGrid(rawText);
   if (!grid.length) return [];
   const allowedByKey = new Map(people.map((p) => [normalizeKey(p), p]));
   const personDays = new Map(people.map((p) => [p, new Set()]));
@@ -930,11 +962,9 @@ function init() {
       persist("vacaciones auto");
       const msg = `Vacaciones automáticas actualizadas para ${weekStartIso} a ${weekEndIso} (${autoRanges.length} rangos).`;
       status(msg, "ok");
-      if (!silent) alert(msg);
     } catch (e) {
       const msg = `No se pudo actualizar vacaciones automáticas: ${e.message}`;
       status(msg, "bad");
-      if (!silent) alert(msg);
     } finally {
       qs("btnSyncVacations").disabled = false;
     }
