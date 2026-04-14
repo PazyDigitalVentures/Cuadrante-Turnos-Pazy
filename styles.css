@@ -244,6 +244,11 @@ input:focus, select:focus, textarea:focus{
 }
 
 .actions{ display:flex; gap:10px; align-items:center; }
+/* Seguridad visual: ocultar botón OCR antiguo aunque llegue HTML cacheado */
+#btnImportVacImage,
+#vacImageFile{
+  display: none !important;
+}
 .btn{
   height: 32px;
   padding: 0 10px;
