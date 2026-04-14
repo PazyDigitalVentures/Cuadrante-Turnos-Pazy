@@ -286,13 +286,26 @@ function inIsoRange(iso, fromIso, toIso) {
   return iso >= fromIso && iso <= toIso;
 }
 
+function detectFirstPeopleRow(grid, people) {
+  const allowed = new Set(people.map((p) => normalizeKey(p)));
+  for (let r = 0; r < grid.length; r++) {
+    const name = normalizeKey(fixName(grid[r]?.[2] || ""));
+    if (allowed.has(name)) return r;
+  }
+  return 14; // fallback histórico (fila 15)
+}
+
 function extractAutoVacationRanges(csvText, people, baseYear, fromIso, toIso) {
   const grid = parseCsv(csvText);
   if (!grid.length) return [];
-  const columns = buildDateColumnsFixedLayout(grid, baseYear);
+  let columns = buildDateColumnsFixedLayout(grid, baseYear);
+  if (!columns.length) {
+    const dyn = buildDateColumns(grid, baseYear);
+    columns = dyn.columns || [];
+  }
   if (!columns.length) return [];
   const nameCol = 2; // columna C
-  const firstPersonRow = 14; // fila 15
+  const firstPersonRow = detectFirstPeopleRow(grid, people);
   const allowedByKey = new Map(people.map((p) => [normalizeKey(p), p]));
   const personDays = new Map(people.map((p) => [p, new Set()]));
   for (let r = firstPersonRow; r < grid.length; r++) {
