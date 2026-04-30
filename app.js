@@ -274,6 +274,39 @@ function applyAdjacentWeekendRule(isoSet) {
   for (const iso of extra) isoSet.add(iso);
 }
 
+/**
+ * Regla puente con festivo:
+ * - Si hay festivo en viernes y la persona tiene vacaciones el jueves anterior,
+ *   se bloquea tambien viernes (festivo) + sabado + domingo.
+ * - Si hay festivo en lunes y la persona tiene vacaciones el martes siguiente,
+ *   se bloquea tambien lunes (festivo) + sabado + domingo previos.
+ */
+function applyHolidayBridgeRule(isoSet) {
+  const extra = new Set();
+  for (const h of FIXED_HOLIDAYS) {
+    const dt = parseISO(h.iso);
+    if (!dt) continue;
+    const dow = dt.getDay();
+    if (dow === 5) {
+      const thursdayIso = toISO(addDays(dt, -1));
+      if (isoSet.has(thursdayIso)) {
+        extra.add(h.iso);
+        extra.add(toISO(addDays(dt, 1)));
+        extra.add(toISO(addDays(dt, 2)));
+      }
+    }
+    if (dow === 1) {
+      const tuesdayIso = toISO(addDays(dt, 1));
+      if (isoSet.has(tuesdayIso)) {
+        extra.add(h.iso);
+        extra.add(toISO(addDays(dt, -1)));
+        extra.add(toISO(addDays(dt, -2)));
+      }
+    }
+  }
+  for (const iso of extra) isoSet.add(iso);
+}
+
 function buildDateColumnsFixedLayout(grid, fallbackYear) {
   const YEAR_ROW = 10; // fila 11
   const MONTH_ROW = 11; // fila 12
@@ -372,6 +405,7 @@ function extractAutoVacationRangesFromExportTable(rawText, people, fromIso, toIs
   for (const [person, setDays] of personDays.entries()) {
     if (!setDays.size) continue;
     applyAdjacentWeekendRule(setDays);
+    applyHolidayBridgeRule(setDays);
     const sorted = [...setDays].sort();
     for (const rg of compactRanges(sorted)) ranges.push({ person, from: rg.from, to: rg.to, source: "auto" });
   }
@@ -414,6 +448,7 @@ function extractAutoVacationRanges(csvText, people, baseYear, fromIso, toIso) {
   for (const [person, setDays] of personDays.entries()) {
     if (!setDays.size) continue;
     applyAdjacentWeekendRule(setDays);
+    applyHolidayBridgeRule(setDays);
     const sorted = [...setDays].sort();
     for (const rg of compactRanges(sorted)) {
       ranges.push({ person, from: rg.from, to: rg.to, source: "auto" });
@@ -546,6 +581,7 @@ async function extractAutoVacationRangesFromImage(file, people, baseYear) {
     for (const [person, setDays] of personDays.entries()) {
       if (!setDays.size) continue;
       applyAdjacentWeekendRule(setDays);
+      applyHolidayBridgeRule(setDays);
       const sorted = [...setDays].sort();
       for (const rg of compactRanges(sorted)) ranges.push({ person, from: rg.from, to: rg.to, source: "auto" });
     }
