@@ -53,6 +53,34 @@ const MONTH_MAP = {
   nov: 10, noviembre: 10,
   dic: 11, diciembre: 11,
 };
+const FIXED_HOLIDAYS = [
+  { iso: "2026-05-01", name: "Fiesta del Trabajo", type: "Nacional" },
+  { iso: "2026-05-02", name: "Fiesta de la Comunidad de Madrid", type: "Autonomico" },
+  { iso: "2026-05-15", name: "San Isidro Labrador", type: "Local Madrid capital" },
+  { iso: "2026-08-15", name: "Asuncion de la Virgen", type: "Nacional" },
+  { iso: "2026-10-12", name: "Fiesta Nacional de Espana", type: "Nacional" },
+  { iso: "2026-11-02", name: "Traslado de Todos los Santos", type: "Nacional / traslado" },
+  { iso: "2026-11-09", name: "Nuestra Senora de la Almudena", type: "Local Madrid capital" },
+  { iso: "2026-12-07", name: "Traslado del Dia de la Constitucion", type: "Nacional / traslado" },
+  { iso: "2026-12-08", name: "Inmaculada Concepcion", type: "Nacional" },
+  { iso: "2026-12-25", name: "Navidad", type: "Nacional" },
+  { iso: "2027-01-01", name: "Ano Nuevo", type: "Nacional" },
+  { iso: "2027-01-06", name: "Reyes", type: "Nacional" },
+  { iso: "2027-03-25", name: "Jueves Santo", type: "Autonomico / laboral en Madrid" },
+  { iso: "2027-03-26", name: "Viernes Santo", type: "Nacional" },
+  { iso: "2027-05-01", name: "Fiesta del Trabajo", type: "Nacional" },
+  { iso: "2027-05-03", name: "Traslado del Dia de la Comunidad de Madrid", type: "Autonomico" },
+  { iso: "2027-05-15", name: "San Isidro Labrador", type: "Local Madrid capital" },
+  { iso: "2027-07-26", name: "Traslado de Santiago Apostol", type: "Autonomico / sustituible" },
+  { iso: "2027-08-16", name: "Traslado de la Asuncion de la Virgen", type: "Nacional / traslado" },
+  { iso: "2027-10-12", name: "Fiesta Nacional de Espana", type: "Nacional" },
+  { iso: "2027-11-01", name: "Todos los Santos", type: "Nacional" },
+  { iso: "2027-11-09", name: "Nuestra Senora de la Almudena", type: "Local Madrid capital" },
+  { iso: "2027-12-06", name: "Dia de la Constitucion Espanola", type: "Nacional" },
+  { iso: "2027-12-08", name: "Inmaculada Concepcion", type: "Nacional" },
+  { iso: "2027-12-25", name: "Navidad", type: "Nacional" },
+];
+const HOLIDAY_BY_ISO = Object.fromEntries(FIXED_HOLIDAYS.map((h) => [h.iso, h]));
 
 function fixName(s) {
   const n = norm(s);
@@ -536,6 +564,17 @@ function computeThursday(isoDate) {
   return toISO(x);
 }
 
+function getHolidayInfo(iso) {
+  return HOLIDAY_BY_ISO[iso] || null;
+}
+
+function isNonWorkingDate(dateOrIso) {
+  const iso = typeof dateOrIso === "string" ? dateOrIso : toISO(dateOrIso);
+  const date = typeof dateOrIso === "string" ? parseISO(dateOrIso) : dateOrIso;
+  const day = date?.getDay?.() ?? -1;
+  return day === 0 || day === 6 || Boolean(getHolidayInfo(iso));
+}
+
 function weekFrom(startISO) {
   const base = parseISO(startISO);
   return DAYS.map((day, i) => {
@@ -559,7 +598,7 @@ function emptySchedule(weekStart) {
     for (const f of FRANJAS) {
       for (const t of TIPOS) {
         const id = slotId(d.iso, f.key, t.key);
-        const forceTodosMorning = f.key === "MANANA" && [1, 2, 3, 4, 5].includes(d.date.getDay());
+        const forceTodosMorning = f.key === "MANANA" && !isNonWorkingDate(d.date) && [1, 2, 3, 4, 5].includes(d.date.getDay());
         out.slots[id] = {
           id,
           fecha: d.iso,
@@ -665,13 +704,16 @@ function renderCalendar(state) {
   for (let d = 1; d <= last.getDate(); d++) {
     const dt = new Date(target.getFullYear(), target.getMonth(), d);
     const iso = toISO(dt);
-    cells.push({ d, iso, inWeek: inWeek.has(iso), isThu: iso === state.weekStart });
+    const holiday = getHolidayInfo(iso);
+    const nonWorking = isNonWorkingDate(dt);
+    cells.push({ d, iso, inWeek: inWeek.has(iso), isThu: iso === state.weekStart, nonWorking, holiday });
   }
   while (cells.length % 7 !== 0) cells.push({ empty: true });
   const heads = ["L", "M", "X", "J", "V", "S", "D"];
   qs("miniCalendar").innerHTML = heads.map((h) => `<div class="calHead">${h}</div>`).join("") + cells.map((c) => {
     if (c.empty) return `<div class="calCell off"></div>`;
-    return `<div class="calCell${c.inWeek ? " inWeek" : ""}${c.isThu ? " isThu" : ""}">${c.d}</div>`;
+    const title = c.holiday ? `${c.holiday.name} (${c.holiday.type})` : (c.nonWorking ? "No laborable" : "");
+    return `<div class="calCell${c.inWeek ? " inWeek" : ""}${c.isThu ? " isThu" : ""}${c.nonWorking ? " nonWorking" : ""}${c.holiday ? " holiday" : ""}"${title ? ` title="${escapeHtml(title)}"` : ""}>${c.d}${c.nonWorking ? '<span class="calMark">-</span>' : ""}</div>`;
   }).join("");
 }
 
@@ -782,13 +824,13 @@ function generate(schedule, state) {
   const rng = mulberry32(seed);
   const stats = new Map(state.people.map((p) => [p, { total: 0, byFranja: { MANANA: 0, TARDE: 0, NOCHE: 0 }, fijo: 0, backup: 0 }]));
   for (const day of weekFrom(schedule.weekStart)) {
-    const isWorkdayMorningByDefault = [1, 2, 3, 4, 5].includes(day.date.getDay());
-    if (!isWorkdayMorningByDefault) continue;
+    const isWorkdayMorningByDefault = [1, 2, 3, 4, 5].includes(day.date.getDay()) && !isNonWorkingDate(day.date);
     for (const tipo of TIPOS) {
       const id = slotId(day.iso, "MANANA", tipo.key);
       const cur = schedule.slots[id];
       if (!cur) continue;
-      schedule.slots[id] = { ...cur, modo: "TODOS", asignadoA: "" };
+      if (isWorkdayMorningByDefault) schedule.slots[id] = { ...cur, modo: "TODOS", asignadoA: "" };
+      else schedule.slots[id] = { ...cur, modo: "NORMAL", asignadoA: "" };
     }
   }
   for (const s of Object.values(schedule.slots)) if (s.modo !== "TODOS") s.asignadoA = "";
@@ -798,6 +840,12 @@ function generate(schedule, state) {
       for (const tipo of TIPOS) {
         const id = slotId(day.iso, franja.key, tipo.key);
         const cur = schedule.slots[id];
+        const skipMorningOnNonWorking = franja.key === "MANANA" && isNonWorkingDate(day.date);
+        if (skipMorningOnNonWorking) {
+          cur.modo = "NORMAL";
+          cur.asignadoA = "";
+          continue;
+        }
         if (cur.modo === "TODOS") continue;
         let cands = availableForDate(state.people, vacMap, day.iso).filter((n) => !usedToday.has(n));
         if (!cands.length) cands = availableForDate(state.people, vacMap, day.iso);
