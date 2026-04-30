@@ -840,12 +840,6 @@ function generate(schedule, state) {
       for (const tipo of TIPOS) {
         const id = slotId(day.iso, franja.key, tipo.key);
         const cur = schedule.slots[id];
-        const skipMorningOnNonWorking = franja.key === "MANANA" && isNonWorkingDate(day.date);
-        if (skipMorningOnNonWorking) {
-          cur.modo = "NORMAL";
-          cur.asignadoA = "";
-          continue;
-        }
         if (cur.modo === "TODOS") continue;
         let cands = availableForDate(state.people, vacMap, day.iso).filter((n) => !usedToday.has(n));
         if (!cands.length) cands = availableForDate(state.people, vacMap, day.iso);
